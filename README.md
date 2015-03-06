@@ -25,7 +25,7 @@ This file is for business and test.
 ## Use
 To upload images from imagePath and download zip file to packagePath.
 ````
-cd <QCAR.py folder>
 // set config.ini before this
+cd <QCAR.py folder>
 python Service.py
 ````
