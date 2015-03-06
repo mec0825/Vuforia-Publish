@@ -23,13 +23,21 @@ packagePath = config.get('Settings','packagePath')
 
 
 session, user =  QCAR.QCAR_Login(username, password)
-response = QCAR.QCAR_Validate_Databases(session, user, databaseName)
+
+licenses = QCAR.QCAR_Get_Licenses(session, user)
+response = QCAR.QCAR_Validate_Databases(session, user, databaseName, licenses[0].licenseID)
 validateResult = response.content
+
+print validateResult
+
 if validateResult == "true":
     print ">>> database exist"
 else:
     print ">>> create database"
-    QCAR.QCAR_Create_Databases(session, user, databaseName)
+    if len(licenses) > 0:
+        QCAR.QCAR_Create_License_Databases(session, user, databaseName, licenses[0].licenseID)
+    else:
+        print ">>> no license find"
 
 databases = QCAR.QCAR_Get_Databases(session, user)
 
@@ -80,7 +88,6 @@ for root, dirs, files in os.walk(imagePath):
         if canAdd == True:
             if element.split('.')[1] == 'JPG' or element.split('.')[1] == 'jpg':
                 QCAR.QCAR_Add_Target(session, user, database, element.split('.')[0], imagePath + element)
-            
 
 isTargetsReady = False
 while isTargetsReady == False:
@@ -96,4 +103,4 @@ while isTargetsReady == False:
             isTargetsReady = False
             time.sleep(15)
 
-QCAR.QCAR_Download_Package(session, user, database, targetList, packagePath)
+QCAR.QCAR_Download_Package(session, user, database, targetList, packagePath, licenses[0].licenseID)

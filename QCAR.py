@@ -30,11 +30,29 @@ class User:
         )
 
 
+class License:
+    def __init__(self, appName, productName, licenseID):
+        self.appName = appName
+        self.productName = productName
+        self.licenseID = licenseID
+
+    def __repr__(self):
+        return '\
+        \n---------------------------------------------\
+        \nApp Name: %s\
+        \nProduct Name: %s\
+        \nLicense ID: %s\
+        \n---------------------------------------------' %(
+            self.appName,
+            self.productName,
+            self.licenseID
+        )
+
 class Database:
-    def __init__(self, databaseName, databaseID, parentTargetID, targetCount):
+    def __init__(self, databaseName, databaseID, appName, targetCount):
         self.databaseName = databaseName
         self.databaseID = databaseID
-        self.parentTargetID = parentTargetID 
+        self.appName = appName 
         self.targetCount = targetCount
 
     def __repr__(self):
@@ -42,21 +60,20 @@ class Database:
         \n---------------------------------------------\
         \nDatabase Name: %s\
         \nDatabase ID: %s\
-        \nParentTargetID: %s\
+        \nApp Name: %s\
         \nTarget Count:%s\
         \n---------------------------------------------' %(
             self.databaseName,
             self.databaseID,
-            self.parentTargetID,
+            self.appName,
             self.targetCount
         )
 
 
 class ImageTarget:
-    def __init__(self, targetName, targetID, parentTargetID, targetRating):
+    def __init__(self, targetName, targetID, targetRating):
         self.targetName = targetName
         self.targetID = targetID
-        self.parentTargetID = parentTargetID
         self.targetRating = targetRating
 
     def __repr__(self):
@@ -64,12 +81,10 @@ class ImageTarget:
         \n---------------------------------------------\
         \nImageTarget Name: %s\
         \nImageTarget ID: %s\
-        \nParentTargetID: %s\
         \nImageTarget Rating: %d\
         \n---------------------------------------------' %(
             self.targetName,
             self.targetID,
-            self.parentTargetID,
             self.targetRating
         )
 
@@ -118,7 +133,7 @@ def QCAR_Login(username, password):
 
     r = session.post(LOGIN_URL, headers=headers, data=loginData, verify='./G3', timeout=requestTimeOut)
 
-    if r.text.find('My Account') != -1:
+    if r.text.find('Hello') != -1:
         print '>>> login success'
         file_object.write('>>> login success \n')
 
@@ -157,9 +172,96 @@ def QCAR_Login(username, password):
 
 
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
+# Get License List
+# ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+LICENSE_URL = 'https://developer.vuforia.com/targetmanager/licenseManager/userLicenseDisplayListing'
+
+LICENSES_MAX = 1000
+
+def QCAR_Get_Licenses(session, user):
+
+    print session
+
+    licenseList = []
+
+    '''
+    result = session.get(TOKEN_URL)
+    #print result.text
+
+    token = re.findall('<input type="hidden" name="CSRFToken" value="(.*?)">', result.text, re.S)[0]
+    print '>>> token: %s' %(token)
+    '''
+
+    licenseData = '\
+    {\
+    "sEcho":1,\
+    "iColumns":5,\
+    "sColumns":"",\
+    "iDisplayStart":0,\
+    "iDisplayLength":%d,\
+    "amDataProp":[0,1,2,3,4],\
+    "sSearch":"",\
+    "bRegex":false,\
+    "asSearch":["","","","",""],\
+    "abRegex":[false,false,false,false,false],\
+    "abSearchable":[true,true,true,true,true],\
+    "aiSortCol":[0],\
+    "asSortDir":["asc"],\
+    "iSortingCols":1,\
+    "abSortable":[true,true,true,true,true],\
+    "dataToBeShownForUser":"%s"\
+    }' %(LICENSES_MAX,user.userID)
+
+    headers = {
+        'CSRFToken': user.token,
+        'content-type': 'application/json;charset=UTF-8',
+        'Host': 'developer.vuforia.com',
+        'Origin': 'https://developer.vuforia.com',
+        'Referer': 'https://developer.vuforia.com/targetmanager/licenseManager/licenseListing',
+        'X-Requested-With': 'XMLHttpRequest',
+        'User-Agent': userAgent
+    }
+
+    result = session.post(LICENSE_URL, data=licenseData, headers=headers, timeout=requestTimeOut)
+    jsonRes = json.loads(result.text)
+    licenseRes = jsonRes['aaData']
+
+    '''
+    for group in dataBaseRes:
+        for element in group.keys():
+
+            if(group[element] != None and group[element]['project'] != None):
+                ndataBase = Database(
+                    group[element]['project']['projectName'],
+                    group[element]['project']['projectId'],
+                    group[element]['parentTargetId'],
+                    group[element]['targetCount']
+                )
+
+                databaseList.append(ndataBase)
+    '''
+    for element in licenseRes:
+        nLicense = License(
+            element['app_name'],
+            element['product_name'],
+            element['license_id']
+        )
+        licenseList.append(nLicense)
+    
+    file_object = open('log_a.txt', 'a+')
+    print licenseList
+    file_object.write(('%s'%(licenseList)) + '\n')
+    file_object.close()
+    return licenseList
+
+
+
+# ///////////////////////////////////////////////////////////////////////////////////////////////////
 # Create Database
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+'''
 CREATEDB_URL = 'https://developer.vuforia.com/targetmanager/project/deviceProjects'
 
 def QCAR_Create_Databases(session, user, databaseName):
@@ -191,8 +293,49 @@ def QCAR_Create_Databases(session, user, databaseName):
     file_object.write(result.text + '\n')
     file_object.close()
     return result
+'''
 
+CREATEDB_LICENSE_URL = 'https://developer.vuforia.com/targetmanager/project/createDatabaseWithLicense'
 
+def QCAR_Create_License_Databases(session, user, databaseName, licenseID):
+
+    print licenseID
+
+    jsonData = {
+        "dbtype":"device",
+        "databaseTypeForLicenseFeature":"device",
+        "databaseType":"tms",
+        "applicationID":licenseID,
+        "project_name":databaseName,
+        'CSRFToken': user.token
+    }
+
+    headers = {
+        "Accept":"application/json, text/javascript, */*; q=0.01",
+        "Accept-Encoding":"gzip, deflate",
+        "Accept-Language":"zh-CN,zh;q=0.8,en;q=0.6,ja;q=0.4,zh-TW;q=0.2",
+        "Connection":"keep-alive",
+        "Content-Length":"188",
+        "Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
+        "Host":"developer.vuforia.com",
+        "Origin":"https://developer.vuforia.com",
+        "Referer":"https://developer.vuforia.com/targetmanager/project/checkDeviceProjectsCreated?dataRequestedForUserId=",
+        "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.76 Safari/537.36",
+        "X-Requested-With":"XMLHttpRequest"
+    }
+
+    result = session.post(CREATEDB_LICENSE_URL, data=jsonData, headers=headers)
+    jsonRes = json.loads(result.text)
+
+    if jsonRes['status'] == 'failed':
+        print jsonRes['message']
+        return False
+    else:
+        file_object = open('log_a.txt', 'a+')
+        print result.text
+        file_object.write(result.text + '\n')
+        file_object.close()
+        return True
 
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 # Validate Database
@@ -200,10 +343,15 @@ def QCAR_Create_Databases(session, user, databaseName):
 
 VALIDATE_URL = 'https://developer.vuforia.com/targetmanager/project/validateProjectName'
 
-def QCAR_Validate_Databases(session, user, databaseName):
+def QCAR_Validate_Databases(session, user, databaseName, licenseID):
 
     createData = {
-        'project_name': databaseName
+        "dbtype":"device",
+        "databaseTypeForLicenseFeature":"device",
+        "databaseType":"tms",
+        "applicationID":licenseID,
+        "project_name":databaseName,
+        'CSRFToken': user.token
     }
 
     headers = {
@@ -268,9 +416,11 @@ def QCAR_Get_Databases(session, user):
     }
 
     result = session.post(DATABASES_URL, data=databaseData, headers=headers, timeout=requestTimeOut)
+    print result.text
     jsonRes = json.loads(result.text)
     dataBaseRes = jsonRes['aaData']
 
+    '''
     for group in dataBaseRes:
         for element in group.keys():
 
@@ -283,6 +433,15 @@ def QCAR_Get_Databases(session, user):
                 )
 
                 databaseList.append(ndataBase)
+    '''
+    for element in dataBaseRes:
+        ndataBase = Database(
+            element['project_name'],
+            element['project_id'],
+            element['app_name'],
+            element['target_count']
+        )
+        databaseList.append(ndataBase)
     
     file_object = open('log_a.txt', 'a+')
     print databaseList
@@ -297,7 +456,7 @@ def QCAR_Get_Databases(session, user):
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #TOKEN_URL_2 = 'https://developer.vuforia.com/targetmanager/deviceTarget/deviceTargetListing'
-IMAGETARGET_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/userDeviceTargetDisplayListing'
+IMAGETARGET_URL = 'https://developer.vuforia.com/targetmanager/project/userDeviceTargetDisplayListing'
 
 IMAGETARGET_MAX = 1000
 
@@ -312,21 +471,31 @@ def QCAR_Get_Targets(session, user, database):
 
     token = re.findall('<input type="hidden" name="CSRFToken" value="(.*?)">', result.text, re.S)[0]
     '''
+    print database.databaseID
 
     imageTargetData = '\
     {\
     "dataToBeShownForUser":"%s",\
-    "sEcho":2,\
-    "iColumns":1,\
+    "sEcho":1,\
+    "iColumns":6,\
     "sColumns":"",\
     "iDisplayStart":0,\
     "iDisplayLength":%d,\
-    "amDataProp":[0],\
-    "iSortingCols":0,\
-    "abSortable":[true],\
+    "amDataProp":[0,1,2,3,4,5],\
+    "sSearch":"",\
+    "bRegex":false,\
+    "asSearch":["","","","","",""],\
+    "abRegex":[false,false,false,false,false,false],\
+    "abSearchable":[true,true,true,true,true,true],\
+    "aiSortCol":[5],\
+    "asSortDir":["desc"],\
+    "iSortingCols":1,\
+    "abSortable":[true,true,true,true,true,true],\
     "synch":false,\
     "projectId":"%s",\
-    "projectIds":[1,2,3]\
+    "projectIds":[1,2,3],\
+    "isLegacyProject":"false",\
+    "dbListingType":"device"\
     }' %(user.userID,IMAGETARGET_MAX,database.databaseID)
 
     headers = {
@@ -337,11 +506,12 @@ def QCAR_Get_Targets(session, user, database):
 
     
     result = session.post(IMAGETARGET_URL, data=imageTargetData, headers=headers, timeout=requestTimeOut)
-    #print result.text
+    print result.text
 
     jsonRes = json.loads(result.text)
     dataBaseRes = jsonRes['aaData']
 
+    '''
     for group in dataBaseRes:
         for element in group.keys():
             
@@ -354,6 +524,14 @@ def QCAR_Get_Targets(session, user, database):
                 )
 
                 imageTargetList.append(nImageTarget)
+    '''
+    for element in dataBaseRes:
+        nImageTarget = ImageTarget(
+            element['target_name'],
+            element['target_id'],
+            element['augmentable_rating']
+        )
+        imageTargetList.append(nImageTarget)
                 
     file_object = open('log_a.txt', 'a+')
     print imageTargetList
@@ -368,7 +546,8 @@ def QCAR_Get_Targets(session, user, database):
 # Add New Target
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-ADDTARGET_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/createNonCloudTarget'
+#ADDTARGET_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/createNonCloudTarget'
+ADDTARGET_URL = 'https://developer.vuforia.com/targetmanager/singleDeviceTarget/createNonCloudTarget'
 DEFAULT_TARGET_WIDTH = 500
 
 def QCAR_Add_Target(session, user, database, targetName, targetPath):
@@ -428,7 +607,8 @@ def QCAR_Add_Target(session, user, database, targetName, targetPath):
 # Delete Target
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-DELETETARGET_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/deviceSingleDeleteTarget'
+#DELETETARGET_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/deviceSingleDeleteTarget'
+DELETETARGET_URL = 'https://developer.vuforia.com/targetmanager/singleDeviceTarget/deviceSingleDeleteTarget'
 
 def QCAR_Delete_Target(session, user, target, database):
 
@@ -462,9 +642,12 @@ def QCAR_Delete_Target(session, user, target, database):
 # Download Package
 # ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-CREATEPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/createDataBaseForDownloadZip'
-CHECKPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/waitForTimeHintExpiry'
-DOWNLOADPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/fetchDataBaseForDownloadZip'
+#CREATEPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/createDataBaseForDownloadZip'
+CREATEPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/project/createDataBaseForDownloadZip'
+#CHECKPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/waitForTimeHintExpiry'
+CHECKPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/project/waitForTimeHintExpiry'
+#DOWNLOADPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/deviceTarget/fetchDataBaseForDownloadZip'
+DOWNLOADPACKAGE_URL = 'https://developer.vuforia.com/targetmanager/project/fetchDataBaseForDownloadZip'
 
 def QCAR_Check_Package(session, token, url):
     
@@ -490,7 +673,7 @@ def QCAR_Check_Package(session, token, url):
     else:
         return False
 
-def QCAR_Download_Package(session, user, database, targetList, downloadPath):
+def QCAR_Download_Package(session, user, database, targetList, downloadPath, licenseID):
 
     '''
     result = session.get(TOKEN_URL)
@@ -557,13 +740,14 @@ def QCAR_Download_Package(session, user, database, targetList, downloadPath):
     downloadData = {
         'dataSetUrl': jsonRes[3],
         'timeDelay': jsonRes[2],
-        'targetIds': jsonRes[7],
+        'targetIds': jsonRes[8],
         'databaseNameForFetchFile': jsonRes[5],
         'download_token_value_id': datetime.datetime.now().microsecond,
         'PROJECT_ID_For_Fetch_File': jsonRes[6],
         'dbType': jsonRes[4],
-        'initialProjName': jsonRes[8],
-        'CSRFToken': user.token
+        'initialProjName': jsonRes[7],
+        'CSRFToken': user.token,
+        'projectLicenseId': licenseID
     }
 
     headers = {
